@@ -26,6 +26,10 @@ init :
     -> (Auth.Common.ToBackend -> Cmd frontendMsg)
     -> ( { frontendModel | authFlow : Auth.Common.Flow, authRedirectBaseUrl : Url }, Cmd frontendMsg )
 init model methodId origin navigationKey toBackendFn =
+    let
+        _ =
+            Debug.log "Auth.Flow.init!! " ( methodId, origin, navigationKey )
+    in
     case methodId of
         "EmailMagicLink" ->
             Auth.Method.EmailMagicLink.onFrontendCallbackInit model methodId origin navigationKey toBackendFn

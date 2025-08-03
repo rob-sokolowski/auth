@@ -32,12 +32,19 @@ onFrontendCallbackInit model methodId origin navigationKey toBackendFn =
     in
     case OAuth.parseCode origin of
         OAuth.Empty ->
+            let
+                _ =
+                    Debug.log "Auth.Protocol.OAuth.onFrontendCallbackInit: No OAuth code found in URL" origin
+            in
             ( { model | authFlow = Idle }
             , Cmd.none
             )
 
         OAuth.Success { code, state } ->
             let
+                _ =
+                    Debug.log "Auth.Protocol.OAuth.onFrontendCallbackInit: OAuth code found in URL" code
+
                 state_ =
                     state |> Maybe.withDefault ""
 
@@ -52,6 +59,10 @@ onFrontendCallbackInit model methodId origin navigationKey toBackendFn =
             )
 
         OAuth.Error error ->
+            let
+                _ =
+                    Debug.log "Auth.Protocol.OAuth.onFrontendCallbackInit: Error parsing OAuth code" error
+            in
             ( { model | authFlow = Errored <| ErrAuthorization error }
             , clearUrl
             )

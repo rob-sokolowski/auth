@@ -9,7 +9,6 @@ import Dict exposing (Dict)
 import Hack
 import Http
 import Json.Decode as Json
-import OAuth as Oauth
 import OAuth.AuthorizationCode as OAuth
 import OAuth.AuthorizationCode.PKCE as PKCE
 import Process
@@ -131,15 +130,6 @@ generateSigninUrl baseUrl state configuration =
             else
                 { baseUrl | query = Nothing }
 
-        authorization : OAuth.Authorization
-        authorization =
-            { clientId = configuration.clientId
-            , redirectUri = { queryAdjustedUrl | path = "/login/" ++ configuration.id ++ "/callback" }
-            , scope = configuration.scope
-            , state = Just state
-            , url = configuration.authorizationEndpoint
-            }
-
         authorizationPkce : PKCE.Authorization
         authorizationPkce =
             { clientId = configuration.clientId
@@ -152,10 +142,6 @@ generateSigninUrl baseUrl state configuration =
     in
     authorizationPkce
         |> PKCE.makeAuthorizationUrl
-
-
-
---|> OAuth.makeAuthorizationUrl
 
 
 onAuthCallbackReceived :

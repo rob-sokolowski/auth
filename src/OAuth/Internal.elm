@@ -276,7 +276,10 @@ makeAuthorizationUrl : ResponseType -> Dict String String -> Authorization -> Ur
 makeAuthorizationUrl responseType extraFields { clientId, url, redirectUri, scope, state } =
     let
         query =
-            [ Builder.string "client_id" clientId
+            [ Builder.string "redirect_uri" (makeRedirectUri redirectUri)
+            , Builder.string "client_id" clientId
+
+            --, Builder.string "client_key" clientId
             , Builder.string "redirect_uri" (makeRedirectUri redirectUri)
             , Builder.string "response_type" (responseTypeToString responseType)
             ]

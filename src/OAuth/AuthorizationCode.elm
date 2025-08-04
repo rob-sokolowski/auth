@@ -419,6 +419,8 @@ makeTokenRequestWith grantType decoder extraFields toMsg { credentials, code, ur
         body =
             [ Builder.string "grant_type" (grantTypeToString grantType)
             , Builder.string "client_id" credentials.clientId
+
+            --, Builder.string "client_key" credentials.clientId
             , Builder.string "client_secret" (credentials.secret |> Maybe.withDefault "")
             , Builder.string "redirect_uri" (makeRedirectUri redirectUri)
             , Builder.string "code" code
@@ -435,6 +437,7 @@ makeTokenRequestWith grantType decoder extraFields toMsg { credentials, code, ur
         headers =
             makeHeaders Nothing
 
+        -- TODO: I removed this because I was having issues with TikTok. However I didn't test the tiktok flow with this (yet)
         --makeHeaders <|
         --    case credentials.secret of
         --        Nothing ->

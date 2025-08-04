@@ -201,8 +201,8 @@ validateCallbackToken clientId clientSecret tokenEndpoint redirectUri code =
         auth : PKCE.Authentication
         auth =
             { credentials =
-                { clientId = "sbawjhqdz3dtygvu2p" -- your TikTok client_key
-                , secret = Just "Ru414BQVPaXvcXT3BdYj6h2K0uIUSvrv" -- your TikTok client_secret
+                { clientId = clientId
+                , secret = Just clientSecret
                 }
             , code = code
             , codeVerifier = Hack.codeVerifier
@@ -212,22 +212,9 @@ validateCallbackToken clientId clientSecret tokenEndpoint redirectUri code =
                 tokenEndpoint
             }
 
+        req : PKCE.RequestParts ()
         req =
-            PKCE.makeTokenRequest Types.GotTokenResponse auth
-
-        _ =
-            Debug.log "PKCE.makeTokenRequest!! " req
-
-        --req =
-        --    OAuth.makeTokenRequest (always ())
-        --        { credentials =
-        --            { clientId = clientId
-        --            , secret = Just clientSecret
-        --            }
-        --        , code = code
-        --        , url = tokenEndpoint
-        --        , redirectUri = { redirectUri | query = Nothing, fragment = Nothing }
-        --        }
+            PKCE.makeTokenRequest (always ()) auth
     in
     { method = req.method
     , headers = req.headers ++ [ Http.header "Accept" "application/json" ]

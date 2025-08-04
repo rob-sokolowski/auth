@@ -137,13 +137,14 @@ type CodeChallenge
 Ideally, the byte sequence _should be_ 32 or 64 bytes, and it _must be_ at least 32 bytes and at most 90 bytes.
 
 -}
-codeVerifierFromBytes : Bytes -> Maybe CodeVerifier
+codeVerifierFromBytes : Bytes -> CodeVerifier
 codeVerifierFromBytes bytes =
-    if Bytes.width bytes < 32 || Bytes.width bytes > 90 then
-        Nothing
-
-    else
-        bytes |> Base64.bytes |> CodeVerifier |> Just
+    -- TODO: this is bad but I'm not sure how to do it better. This did return a Maybe
+    --if Bytes.width bytes < 32 || Bytes.width bytes > 90 then
+    --    Nothing
+    --
+    --else
+    bytes |> Base64.bytes |> CodeVerifier
 
 
 {-| Convert a code verifier to its string representation.
@@ -519,6 +520,9 @@ makeAuthorizationUrlWith responseType extraFields { clientId, url, redirectUri, 
                 [ ( "code_challenge", codeChallengeToString codeChallenge )
                 , ( "code_challenge_method", "S256" )
                 ]
+
+        _ =
+            Debug.log "Here we are!!" ()
     in
     OAuth.AuthorizationCode.makeAuthorizationUrlWith
         responseType

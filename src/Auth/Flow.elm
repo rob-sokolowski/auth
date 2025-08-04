@@ -2,8 +2,6 @@ module Auth.Flow exposing (..)
 
 import Auth.Common exposing (LogoutEndpointConfig(..), MethodId, ToBackend(..))
 import Auth.Method.EmailMagicLink
-import Auth.Method.OAuthGithub
-import Auth.Method.OAuthGoogle
 import Auth.Protocol.OAuth
 import Browser.Navigation as Navigation
 import Dict exposing (Dict)
@@ -41,6 +39,13 @@ init model methodId origin navigationKey toBackendFn =
             Auth.Protocol.OAuth.onFrontendCallbackInit model methodId origin navigationKey toBackendFn
 
         "OAuthAuth0" ->
+            Auth.Protocol.OAuth.onFrontendCallbackInit model methodId origin navigationKey toBackendFn
+
+        "OAuthTikTok" ->
+            let
+                _ =
+                    Debug.log "Auth.Flow.init OAuthTikTok!! " ( methodId, origin, navigationKey )
+            in
             Auth.Protocol.OAuth.onFrontendCallbackInit model methodId origin navigationKey toBackendFn
 
         _ ->

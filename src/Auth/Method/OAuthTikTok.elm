@@ -13,9 +13,9 @@ import Json.Decode.Pipeline exposing (..)
 import List.Extra as List
 import OAuth
 import OAuth.AuthorizationCode as OAuth
+import OAuth.AuthorizationCode.PKCE as PKCE
 import Task exposing (Task)
 import Url exposing (Protocol(..), Url)
-import Url.Builder
 
 
 configuration :
@@ -33,14 +33,8 @@ configuration clientId clientSecret =
         , authorizationEndpoint =
             { defaultHttpsUrl
                 | host = "www.tiktok.com"
-                , path = "/v2/auth/authorize/"
-
-                --, query =
-                --    Just
-                --        [ ( "response_type", "code" )
-                --        , ( "client_key", clientId )
-                --        -- scope and redirect_uri are added at runtime
-                --        ]
+                , path = "/v2/auth/authorize"
+                , query = Just "disable_auto_auth=1"
             }
         , tokenEndpoint =
             { defaultHttpsUrl
@@ -52,9 +46,7 @@ configuration clientId clientSecret =
         , clientId = clientId
         , clientSecret = clientSecret
         , scope =
-            [ "user.info.profile"
-            , "user.info.stats"
-            , "video.list"
+            [ "user.info.basic"
             ]
         , getUserInfo = getUserInfo
         , onFrontendCallbackInit = Auth.Protocol.OAuth.onFrontendCallbackInit
@@ -63,7 +55,7 @@ configuration clientId clientSecret =
 
 
 getUserInfo :
-    OAuth.AuthenticationSuccess
+    PKCE.AuthenticationSuccess
     -> Task Auth.Common.Error UserInfo
 getUserInfo authenticationSuccess =
     getUserInfoTask authenticationSuccess
@@ -77,7 +69,7 @@ getUserInfo authenticationSuccess =
             )
 
 
-fallbackGetEmailFromEmails : OAuth.AuthenticationSuccess -> UserInfo -> Task Auth.Common.Error UserInfo
+fallbackGetEmailFromEmails : PKCE.AuthenticationSuccess -> UserInfo -> Task Auth.Common.Error UserInfo
 fallbackGetEmailFromEmails authenticationSuccess userInfo =
     getUserEmailsTask authenticationSuccess
         |> Task.andThen
@@ -94,12 +86,39 @@ fallbackGetEmailFromEmails authenticationSuccess userInfo =
         |> Task.mapError (HttpHelpers.httpErrorToString >> Auth.Common.ErrAuthString)
 
 
-getUserInfoTask : OAuth.AuthenticationSuccess -> Task Auth.Common.Error UserInfo
+getUserInfoTask : PKCE.AuthenticationSuccess -> Task Auth.Common.Error UserInfo
 getUserInfoTask authenticationSuccess =
     Http.task
         { method = "GET"
         , headers = OAuth.useToken authenticationSuccess.token []
-        , url = Url.toString { defaultHttpsUrl | host = "api.github.com", path = "/user" }
+        , url =
+            Url.toString
+                { defaultHttpsUrl
+                    | host = "open.tiktokapis.com"
+                    , path = "/v2/user/info/"
+                    , query = Just "fields=display_name"
+                }
+        , body = Http.emptyBody
+        , resolver =
+            HttpHelpers.jsonResolver
+                (Json.at [ "data", "user" ]
+                    (Json.succeed UserInfo
+                        |> optional "display_name" Json.string ""
+                        |> optional "name" decodeNonEmptyString Nothing
+                        |> optional "login" decodeNonEmptyString Nothing
+                    )
+                )
+        , timeout = Nothing
+        }
+        |> Task.mapError (HttpHelpers.httpErrorToString >> Auth.Common.ErrAuthString)
+
+
+getUserInfoTask_ : PKCE.AuthenticationSuccess -> Task Auth.Common.Error UserInfo
+getUserInfoTask_ authenticationSuccess =
+    Http.task
+        { method = "GET"
+        , headers = OAuth.useToken authenticationSuccess.token []
+        , url = Url.toString { defaultHttpsUrl | host = "open.tiktokapis.com", path = "/v2/user/info/" }
         , body = Http.emptyBody
         , resolver =
             HttpHelpers.jsonResolver
@@ -122,7 +141,7 @@ type alias GithubEmail =
     { primary : Bool, email : String }
 
 
-getUserEmailsTask : OAuth.AuthenticationSuccess -> Task Http.Error (List GithubEmail)
+getUserEmailsTask : PKCE.AuthenticationSuccess -> Task Http.Error (List GithubEmail)
 getUserEmailsTask authenticationSuccess =
     Http.task
         { method = "GET"

@@ -38,7 +38,7 @@ module OAuth.Internal exposing
     )
 
 import Base64.Encode as Base64
-import Dict as Dict exposing (Dict)
+import Dict exposing (Dict)
 import Http
 import Json.Decode as Json
 import OAuth exposing (..)
@@ -276,9 +276,11 @@ makeAuthorizationUrl : ResponseType -> Dict String String -> Authorization -> Ur
 makeAuthorizationUrl responseType extraFields { clientId, url, redirectUri, scope, state } =
     let
         query =
-            [ Builder.string "client_id" clientId
+            [ Builder.string "client_key" clientId
             , Builder.string "redirect_uri" (makeRedirectUri redirectUri)
             , Builder.string "response_type" (responseTypeToString responseType)
+
+            --, Builder.string "code_challenge" (PKCE.mkCodeChallenge "WOfSn2kV9TV1u8kLz9vFz3kFbDU1TphV0WBzQINhx4AfFMI1ZC9VXWnyKnO7aYBfzWn3smf5GxQyH5AqMBMHvw")
             ]
                 |> urlAddList "scope" scope
                 |> urlAddMaybe "state" state
@@ -296,14 +298,24 @@ makeAuthorizationUrl responseType extraFields { clientId, url, redirectUri, scop
 
 makeRequest : Json.Decoder success -> (Result Http.Error success -> msg) -> Url -> List Http.Header -> String -> RequestParts msg
 makeRequest decoder toMsg url headers body =
-    { method = "POST"
-    , headers = headers
-    , url = Url.toString url
-    , body = Http.stringBody "application/x-www-form-urlencoded" body
-    , expect = Http.expectJson toMsg decoder
-    , timeout = Nothing
-    , tracker = Nothing
-    }
+    let
+        _ =
+            Debug.log "OAuth.Internal.makeRequest" ( url, headers, body )
+
+        req =
+            { method = "POST"
+            , headers = headers
+            , url = Url.toString url
+            , body = Http.stringBody "application/x-www-form-urlencoded" body
+            , expect = Http.expectJson toMsg decoder
+            , timeout = Nothing
+            , tracker = Nothing
+            }
+
+        _ =
+            Debug.log "OAuth.Internal.makeRequest!! (token intent!) " (Url.toString url)
+    in
+    req
 
 
 makeHeaders : Maybe { clientId : String, secret : String } -> List Http.Header

@@ -102,7 +102,7 @@ request.
 
 -}
 
-import Dict as Dict exposing (Dict)
+import Dict exposing (Dict)
 import Http
 import Json.Decode as Json
 import OAuth exposing (ErrorCode, GrantType(..), ResponseType(..), Token, errorCodeFromString, grantTypeToString)
@@ -418,23 +418,30 @@ makeTokenRequestWith grantType decoder extraFields toMsg { credentials, code, ur
     let
         body =
             [ Builder.string "grant_type" (grantTypeToString grantType)
-            , Builder.string "client_id" credentials.clientId
-            , Builder.string "client_id_secret" (credentials.secret |> Maybe.withDefault "")
+            , Builder.string "client_key" credentials.clientId
+            , Builder.string "client_secret" (credentials.secret |> Maybe.withDefault "")
             , Builder.string "redirect_uri" (makeRedirectUri redirectUri)
             , Builder.string "code" code
+
+            --, Builder.string "code_verifier" "WOfSn2kV9TV1u8kLz9vFz3kFbDU1TphV0WBzQINhx4AfFMI1ZC9VXWnyKnO7aYBfzWn3smf5GxQyH5AqMBMHvw"
             ]
                 |> urlAddExtraFields extraFields
                 |> Builder.toQuery
                 |> String.dropLeft 1
 
-        headers =
-            makeHeaders <|
-                case credentials.secret of
-                    Nothing ->
-                        Nothing
+        _ =
+            Debug.log "makeTokenRequestWith!!body!! " body
 
-                    Just secret ->
-                        Just { clientId = credentials.clientId, secret = secret }
+        headers =
+            makeHeaders Nothing
+
+        --makeHeaders <|
+        --    case credentials.secret of
+        --        Nothing ->
+        --            Nothing
+        --
+        --        Just secret ->
+        --            Just { clientId = credentials.clientId, secret = secret }
     in
     makeRequest decoder toMsg url headers body
 

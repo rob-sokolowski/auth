@@ -9,6 +9,7 @@ import Http
 import Json.Decode as Json
 import OAuth
 import OAuth.AuthorizationCode as OAuth
+import OAuth.AuthorizationCode.PKCE as PKCE
 import Process
 import Task exposing (Task)
 import Time
@@ -70,7 +71,7 @@ type alias ConfigurationOAuth frontendMsg backendMsg frontendModel backendModel 
     , clientId : String
     , clientSecret : String
     , scope : List String
-    , getUserInfo : OAuth.AuthenticationSuccess -> Task Error UserInfo
+    , getUserInfo : PKCE.AuthenticationSuccess -> Task Error UserInfo
     , onFrontendCallbackInit :
         frontendModel
         -> MethodId

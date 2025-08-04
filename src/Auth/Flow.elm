@@ -2,9 +2,8 @@ module Auth.Flow exposing (..)
 
 import Auth.Common exposing (LogoutEndpointConfig(..), MethodId, ToBackend(..))
 import Auth.Method.EmailMagicLink
-import Auth.Method.OAuthGithub
-import Auth.Method.OAuthGoogle
 import Auth.Protocol.OAuth
+import Auth.Protocol.OAuthPKCE
 import Browser.Navigation as Navigation
 import Dict exposing (Dict)
 import List.Extra as List
@@ -26,6 +25,10 @@ init :
     -> (Auth.Common.ToBackend -> Cmd frontendMsg)
     -> ( { frontendModel | authFlow : Auth.Common.Flow, authRedirectBaseUrl : Url }, Cmd frontendMsg )
 init model methodId origin navigationKey toBackendFn =
+    let
+        _ =
+            Debug.log "Auth.Flow.init!! " ( methodId, origin, navigationKey )
+    in
     case methodId of
         "EmailMagicLink" ->
             Auth.Method.EmailMagicLink.onFrontendCallbackInit model methodId origin navigationKey toBackendFn
@@ -37,6 +40,13 @@ init model methodId origin navigationKey toBackendFn =
             Auth.Protocol.OAuth.onFrontendCallbackInit model methodId origin navigationKey toBackendFn
 
         "OAuthAuth0" ->
+            Auth.Protocol.OAuth.onFrontendCallbackInit model methodId origin navigationKey toBackendFn
+
+        "OAuthTikTok" ->
+            let
+                _ =
+                    Debug.log "Auth.Flow.init OAuthTikTok!! " ( methodId, origin, navigationKey )
+            in
             Auth.Protocol.OAuth.onFrontendCallbackInit model methodId origin navigationKey toBackendFn
 
         _ ->
@@ -164,6 +174,9 @@ backendUpdate { asToFrontend, asBackendMsg, sendToFrontend, backendModel, loadMe
 
                         Auth.Common.ProtocolOAuth config ->
                             Auth.Protocol.OAuth.initiateSignin isDev sessionId baseUrl config asBackendMsg now backendModel
+
+                        Auth.Common.ProtocolOAuthPKCE config ->
+                            Auth.Protocol.OAuthPKCE.initiateSignin isDev sessionId baseUrl config asBackendMsg now backendModel
                 )
 
         Auth.Common.AuthSigninInitiatedDelayed_ sessionId initiateMsg ->
@@ -179,6 +192,9 @@ backendUpdate { asToFrontend, asBackendMsg, sendToFrontend, backendModel, loadMe
 
                         Auth.Common.ProtocolOAuth config ->
                             Auth.Protocol.OAuth.onAuthCallbackReceived sessionId clientId config receivedUrl code state now asBackendMsg backendModel
+
+                        Auth.Common.ProtocolOAuthPKCE config ->
+                            Auth.Protocol.OAuthPKCE.onAuthCallbackReceived sessionId clientId config receivedUrl code state now asBackendMsg backendModel
                 )
 
         Auth.Common.AuthSuccess sessionId clientId methodId now res ->
@@ -306,6 +322,9 @@ methodLoader methods methodId =
                         method.id == methodId
 
                     Auth.Common.ProtocolOAuth method ->
+                        method.id == methodId
+
+                    Auth.Common.ProtocolOAuthPKCE method ->
                         method.id == methodId
             )
 

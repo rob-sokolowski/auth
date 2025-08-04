@@ -418,33 +418,25 @@ makeTokenRequestWith grantType decoder extraFields toMsg { credentials, code, ur
     let
         body =
             [ Builder.string "grant_type" (grantTypeToString grantType)
-            , Builder.string "client_id" credentials.clientId
 
-            --, Builder.string "client_key" credentials.clientId
+            --, Builder.string "client_id" credentials.clientId
+            , Builder.string "client_key" credentials.clientId
             , Builder.string "client_secret" (credentials.secret |> Maybe.withDefault "")
             , Builder.string "redirect_uri" (makeRedirectUri redirectUri)
             , Builder.string "code" code
-
-            --, Builder.string "code_verifier" "WOfSn2kV9TV1u8kLz9vFz3kFbDU1TphV0WBzQINhx4AfFMI1ZC9VXWnyKnO7aYBfzWn3smf5GxQyH5AqMBMHvw"
             ]
                 |> urlAddExtraFields extraFields
                 |> Builder.toQuery
                 |> String.dropLeft 1
 
-        _ =
-            Debug.log "makeTokenRequestWith!!body!! " body
-
         headers =
-            makeHeaders Nothing
+            makeHeaders <|
+                case credentials.secret of
+                    Nothing ->
+                        Nothing
 
-        -- TODO: I removed this because I was having issues with TikTok. However I didn't test the tiktok flow with this (yet)
-        --makeHeaders <|
-        --    case credentials.secret of
-        --        Nothing ->
-        --            Nothing
-        --
-        --        Just secret ->
-        --            Just { clientId = credentials.clientId, secret = secret }
+                    Just secret ->
+                        Just { clientId = credentials.clientId, secret = secret }
     in
     makeRequest decoder toMsg url headers body
 

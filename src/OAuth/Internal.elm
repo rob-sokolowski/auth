@@ -277,8 +277,7 @@ makeAuthorizationUrl responseType extraFields { clientId, url, redirectUri, scop
     let
         query =
             [ Builder.string "redirect_uri" (makeRedirectUri redirectUri)
-
-            --, Builder.string "client_id" clientId
+            , Builder.string "client_id" clientId
             , Builder.string "client_key" clientId
             , Builder.string "response_type" (responseTypeToString responseType)
             ]

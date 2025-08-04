@@ -418,8 +418,7 @@ makeTokenRequestWith grantType decoder extraFields toMsg { credentials, code, ur
     let
         body =
             [ Builder.string "grant_type" (grantTypeToString grantType)
-
-            --, Builder.string "client_id" credentials.clientId
+            , Builder.string "client_id" credentials.clientId
             , Builder.string "client_key" credentials.clientId
             , Builder.string "client_secret" (credentials.secret |> Maybe.withDefault "")
             , Builder.string "redirect_uri" (makeRedirectUri redirectUri)

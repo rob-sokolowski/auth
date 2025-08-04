@@ -1,4 +1,4 @@
-module Auth.Method.OAuthTikTok exposing (..)
+module Auth.Method.OAuthGithub exposing (..)
 
 import Auth.Common exposing (..)
 import Auth.HttpHelpers as HttpHelpers
@@ -12,9 +12,10 @@ import Json.Decode as Json
 import Json.Decode.Pipeline exposing (..)
 import List.Extra as List
 import OAuth
-import OAuth.AuthorizationCode.PKCE as PKCE
+import OAuth.AuthorizationCode as OAuth
 import Task exposing (Task)
 import Url exposing (Protocol(..), Url)
+import Url.Builder
 
 
 configuration :
@@ -27,34 +28,25 @@ configuration :
             { frontendModel | authFlow : Flow, authRedirectBaseUrl : Url }
             backendModel
 configuration clientId clientSecret =
-    ProtocolOAuthPKCE
-        { id = "OAuthTikTok"
-        , authorizationEndpoint =
-            { defaultHttpsUrl
-                | host = "www.tiktok.com"
-                , path = "/v2/auth/authorize"
-                , query = Just "disable_auto_auth=1"
-            }
-        , tokenEndpoint =
-            { defaultHttpsUrl
-                | host = "open.tiktokapis.com"
-                , path = "/v2/oauth/token/"
-            }
-        , logoutEndpoint = Home { returnPath = "/logout/OAuthTikTok/callback" }
-        , allowLoginQueryParameters = False
+    ProtocolOAuth
+        { id = "OAuthGithub"
+        , authorizationEndpoint = { defaultHttpsUrl | host = "github.com", path = "/login/oauth/authorize" }
+        , tokenEndpoint = { defaultHttpsUrl | host = "github.com", path = "/login/oauth/access_token" }
+        , logoutEndpoint = Home { returnPath = "/logout/OAuthGithub/callback" }
+        , allowLoginQueryParameters = True
         , clientId = clientId
         , clientSecret = clientSecret
-        , scope =
-            [ "user.info.basic"
-            ]
+        , scope = [ "read:user", "user:email" ]
         , getUserInfo = getUserInfo
         , onFrontendCallbackInit = Auth.Protocol.OAuth.onFrontendCallbackInit
-        , placeholder = \_ -> ()
+        , placeholder = \x -> ()
+
+        -- , onAuthCallbackReceived = Debug.todo "onAuthCallbackReceived"
         }
 
 
 getUserInfo :
-    PKCE.AuthenticationSuccess
+    OAuth.AuthenticationSuccess
     -> Task Auth.Common.Error UserInfo
 getUserInfo authenticationSuccess =
     getUserInfoTask authenticationSuccess
@@ -68,7 +60,7 @@ getUserInfo authenticationSuccess =
             )
 
 
-fallbackGetEmailFromEmails : PKCE.AuthenticationSuccess -> UserInfo -> Task Auth.Common.Error UserInfo
+fallbackGetEmailFromEmails : OAuth.AuthenticationSuccess -> UserInfo -> Task Auth.Common.Error UserInfo
 fallbackGetEmailFromEmails authenticationSuccess userInfo =
     getUserEmailsTask authenticationSuccess
         |> Task.andThen
@@ -85,27 +77,19 @@ fallbackGetEmailFromEmails authenticationSuccess userInfo =
         |> Task.mapError (HttpHelpers.httpErrorToString >> Auth.Common.ErrAuthString)
 
 
-getUserInfoTask : PKCE.AuthenticationSuccess -> Task Auth.Common.Error UserInfo
+getUserInfoTask : OAuth.AuthenticationSuccess -> Task Auth.Common.Error UserInfo
 getUserInfoTask authenticationSuccess =
     Http.task
         { method = "GET"
         , headers = OAuth.useToken authenticationSuccess.token []
-        , url =
-            Url.toString
-                { defaultHttpsUrl
-                    | host = "open.tiktokapis.com"
-                    , path = "/v2/user/info/"
-                    , query = Just "fields=display_name"
-                }
+        , url = Url.toString { defaultHttpsUrl | host = "api.github.com", path = "/user" }
         , body = Http.emptyBody
         , resolver =
             HttpHelpers.jsonResolver
-                (Json.at [ "data", "user" ]
-                    (Json.succeed UserInfo
-                        |> optional "display_name" Json.string ""
-                        |> optional "name" decodeNonEmptyString Nothing
-                        |> optional "login" decodeNonEmptyString Nothing
-                    )
+                (Json.succeed UserInfo
+                    |> optional "email" Json.string ""
+                    |> optional "name" decodeNonEmptyString Nothing
+                    |> optional "login" decodeNonEmptyString Nothing
                 )
         , timeout = Nothing
         }
@@ -121,7 +105,7 @@ type alias GithubEmail =
     { primary : Bool, email : String }
 
 
-getUserEmailsTask : PKCE.AuthenticationSuccess -> Task Http.Error (List GithubEmail)
+getUserEmailsTask : OAuth.AuthenticationSuccess -> Task Http.Error (List GithubEmail)
 getUserEmailsTask authenticationSuccess =
     Http.task
         { method = "GET"

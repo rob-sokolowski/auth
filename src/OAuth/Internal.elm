@@ -276,11 +276,9 @@ makeAuthorizationUrl : ResponseType -> Dict String String -> Authorization -> Ur
 makeAuthorizationUrl responseType extraFields { clientId, url, redirectUri, scope, state } =
     let
         query =
-            [ Builder.string "client_key" clientId
+            [ Builder.string "client_id" clientId
             , Builder.string "redirect_uri" (makeRedirectUri redirectUri)
             , Builder.string "response_type" (responseTypeToString responseType)
-
-            --, Builder.string "code_challenge" (PKCE.mkCodeChallenge "WOfSn2kV9TV1u8kLz9vFz3kFbDU1TphV0WBzQINhx4AfFMI1ZC9VXWnyKnO7aYBfzWn3smf5GxQyH5AqMBMHvw")
             ]
                 |> urlAddList "scope" scope
                 |> urlAddMaybe "state" state

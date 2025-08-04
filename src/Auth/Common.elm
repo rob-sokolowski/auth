@@ -29,6 +29,7 @@ type alias Config frontendMsg toBackend backendMsg toFrontend frontendModel back
 
 type Method frontendMsg backendMsg frontendModel backendModel
     = ProtocolOAuth (ConfigurationOAuth frontendMsg backendMsg frontendModel backendModel)
+    | ProtocolOAuthPKCE (ConfigurationOAuthPKCE frontendMsg backendMsg frontendModel backendModel)
     | ProtocolEmailMagicLink (ConfigurationEmailMagicLink frontendMsg backendMsg frontendModel backendModel)
 
 
@@ -63,6 +64,27 @@ type alias ConfigurationEmailMagicLink frontendMsg backendMsg frontendModel back
 
 
 type alias ConfigurationOAuth frontendMsg backendMsg frontendModel backendModel =
+    { id : String
+    , authorizationEndpoint : Url
+    , tokenEndpoint : Url
+    , logoutEndpoint : LogoutEndpointConfig
+    , allowLoginQueryParameters : Bool
+    , clientId : String
+    , clientSecret : String
+    , scope : List String
+    , getUserInfo : OAuth.AuthenticationSuccess -> Task Error UserInfo
+    , onFrontendCallbackInit :
+        frontendModel
+        -> MethodId
+        -> Url
+        -> Key
+        -> (ToBackend -> Cmd frontendMsg)
+        -> ( frontendModel, Cmd frontendMsg )
+    , placeholder : ( backendModel, backendMsg ) -> ()
+    }
+
+
+type alias ConfigurationOAuthPKCE frontendMsg backendMsg frontendModel backendModel =
     { id : String
     , authorizationEndpoint : Url
     , tokenEndpoint : Url

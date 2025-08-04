@@ -1,17 +1,22 @@
-module Auth.Protocol.OAuth exposing (..)
+module Auth.Protocol.OAuthPKCE exposing (..)
 
 import Auth.Common exposing (..)
 import Auth.HttpHelpers as HttpHelpers
 import Browser.Navigation as Navigation
+import Bytes exposing (Endianness(..))
+import Bytes.Encode
 import Dict exposing (Dict)
+import Hack
 import Http
 import Json.Decode as Json
-import OAuth
+import OAuth as Oauth
 import OAuth.AuthorizationCode as OAuth
+import OAuth.AuthorizationCode.PKCE as PKCE
 import Process
 import SHA1
 import Task exposing (Task)
 import Time
+import Types
 import Url exposing (Url)
 
 
@@ -32,12 +37,19 @@ onFrontendCallbackInit model methodId origin navigationKey toBackendFn =
     in
     case OAuth.parseCode origin of
         OAuth.Empty ->
+            let
+                _ =
+                    Debug.log "OAuth: No code found in URL" ()
+            in
             ( { model | authFlow = Idle }
             , Cmd.none
             )
 
         OAuth.Success { code, state } ->
             let
+                _ =
+                    Debug.log "OAuth: Code found in URL" code
+
                 state_ =
                     state |> Maybe.withDefault ""
 
@@ -52,6 +64,10 @@ onFrontendCallbackInit model methodId origin navigationKey toBackendFn =
             )
 
         OAuth.Error error ->
+            let
+                _ =
+                    Debug.log "OAuth: Error found in URL" error
+            in
             ( { model | authFlow = Errored <| ErrAuthorization error }
             , clearUrl
             )
@@ -69,6 +85,7 @@ accessTokenRequested model methodId code state =
     )
 
 
+initiateSignin : Bool -> String -> Url -> ConfigurationOAuthPKCE frontendMsg backendMsg frontendModel backendModel -> (BackendMsg -> a) -> Time.Posix -> { b | pendingAuths : Dict String PendingAuth } -> ( { b | pendingAuths : Dict String PendingAuth }, Cmd a )
 initiateSignin isDev sessionId baseUrl config asBackendMsg now backendModel =
     let
         signedState =
@@ -103,7 +120,7 @@ initiateSignin isDev sessionId baseUrl config asBackendMsg now backendModel =
     )
 
 
-generateSigninUrl : Url -> Auth.Common.State -> Auth.Common.ConfigurationOAuth frontendMsg backendMsg frontendModel backendModel -> Url
+generateSigninUrl : Url -> Auth.Common.State -> Auth.Common.ConfigurationOAuthPKCE frontendMsg backendMsg frontendModel backendModel -> Url
 generateSigninUrl baseUrl state configuration =
     let
         queryAdjustedUrl =
@@ -114,6 +131,7 @@ generateSigninUrl baseUrl state configuration =
             else
                 { baseUrl | query = Nothing }
 
+        authorization : OAuth.Authorization
         authorization =
             { clientId = configuration.clientId
             , redirectUri = { queryAdjustedUrl | path = "/login/" ++ configuration.id ++ "/callback" }
@@ -121,11 +139,44 @@ generateSigninUrl baseUrl state configuration =
             , state = Just state
             , url = configuration.authorizationEndpoint
             }
+
+        authorizationPkce : PKCE.Authorization
+        authorizationPkce =
+            { clientId = configuration.clientId
+            , redirectUri = { queryAdjustedUrl | path = "/login/" ++ configuration.id ++ "/callback" }
+            , scope = configuration.scope
+            , state = Just state
+            , url = configuration.authorizationEndpoint
+            , codeChallenge = PKCE.mkCodeChallenge Hack.codeVerifier
+            }
     in
-    authorization
-        |> OAuth.makeAuthorizationUrl
+    authorizationPkce
+        |> PKCE.makeAuthorizationUrl
 
 
+
+--|> OAuth.makeAuthorizationUrl
+
+
+onAuthCallbackReceived :
+    SessionId
+    -> ClientId
+    ->
+        { a
+            | clientId : String
+            , clientSecret :
+                String
+            , tokenEndpoint : Url
+            , id : MethodId
+            , getUserInfo : PKCE.AuthenticationSuccess -> Task Error UserInfo
+        }
+    -> Url
+    -> OAuth.AuthorizationCode
+    -> f
+    -> Time.Posix
+    -> (BackendMsg -> c)
+    -> { b | pendingAuths : Dict SessionId { d | state : f } }
+    -> ( { b | pendingAuths : Dict SessionId { d | state : f } }, Cmd c )
 onAuthCallbackReceived sessionId clientId method receivedUrl code state now asBackendMsg backendModel =
     ( backendModel
     , validateCallbackToken method.clientId method.clientSecret method.tokenEndpoint receivedUrl code
@@ -158,25 +209,45 @@ validateCallbackToken :
     -> Url
     -> Url
     -> OAuth.AuthorizationCode
-    -> Task Auth.Common.Error OAuth.AuthenticationSuccess
+    -> Task Auth.Common.Error PKCE.AuthenticationSuccess
 validateCallbackToken clientId clientSecret tokenEndpoint redirectUri code =
     let
-        req =
-            OAuth.makeTokenRequest (always ())
-                { credentials =
-                    { clientId = clientId
-                    , secret = Just clientSecret
-                    }
-                , code = code
-                , url = tokenEndpoint
-                , redirectUri = { redirectUri | query = Nothing, fragment = Nothing }
+        auth : PKCE.Authentication
+        auth =
+            { credentials =
+                { clientId = "sbawjhqdz3dtygvu2p" -- your TikTok client_key
+                , secret = Just "Ru414BQVPaXvcXT3BdYj6h2K0uIUSvrv" -- your TikTok client_secret
                 }
+            , code = code
+            , codeVerifier = Hack.codeVerifier
+            , redirectUri =
+                { redirectUri | query = Nothing, fragment = Nothing }
+            , url =
+                tokenEndpoint
+            }
+
+        req =
+            PKCE.makeTokenRequest Types.GotTokenResponse auth
+
+        _ =
+            Debug.log "PKCE.makeTokenRequest!! " req
+
+        --req =
+        --    OAuth.makeTokenRequest (always ())
+        --        { credentials =
+        --            { clientId = clientId
+        --            , secret = Just clientSecret
+        --            }
+        --        , code = code
+        --        , url = tokenEndpoint
+        --        , redirectUri = { redirectUri | query = Nothing, fragment = Nothing }
+        --        }
     in
     { method = req.method
     , headers = req.headers ++ [ Http.header "Accept" "application/json" ]
     , url = req.url
     , body = req.body
-    , resolver = HttpHelpers.jsonResolver OAuth.defaultAuthenticationSuccessDecoder
+    , resolver = HttpHelpers.jsonResolver PKCE.defaultAuthenticationSuccessDecoder
     , timeout = req.timeout
     }
         |> Http.task
@@ -203,6 +274,10 @@ parseAuthenticationResponse res =
 
 parseAuthenticationResponseError : Http.Error -> Auth.Common.Error
 parseAuthenticationResponseError httpErr =
+    let
+        _ =
+            Debug.log "httpErr!! " httpErr
+    in
     case httpErr of
         Http.BadBody body ->
             case Json.decodeString OAuth.defaultAuthenticationErrorDecoder body of
@@ -216,7 +291,7 @@ parseAuthenticationResponseError httpErr =
             Auth.Common.ErrHTTPGetAccessToken
 
 
-makeToken : Auth.Common.MethodId -> OAuth.AuthenticationSuccess -> Time.Posix -> Auth.Common.Token
+makeToken : Auth.Common.MethodId -> PKCE.AuthenticationSuccess -> Time.Posix -> Auth.Common.Token
 makeToken methodId authenticationSuccess now =
     { methodId = methodId
     , token = authenticationSuccess.token
